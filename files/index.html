@@ -1,0 +1,1137 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Celestes — Simulador do Sistema Solar</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --void: #060810;
+    --void-2: #0a0e1a;
+    --panel: rgba(13,18,32,0.72);
+    --panel-solid: #0d1220;
+    --line: rgba(255,255,255,0.08);
+    --brass: #c9a66b;
+    --brass-dim: rgba(201,166,107,0.35);
+    --teal: #5fc3b4;
+    --text: #e9e6de;
+    --text-dim: #8792a6;
+    --text-faint: #5a637a;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html,body{height:100%;}
+  body{
+    background:
+      radial-gradient(ellipse 120% 80% at 20% -10%, rgba(95,195,180,0.06), transparent 55%),
+      radial-gradient(ellipse 100% 70% at 90% 110%, rgba(201,166,107,0.05), transparent 55%),
+      var(--void);
+    color:var(--text);
+    font-family:'JetBrains Mono', monospace;
+    overflow:hidden;
+    height:100vh;
+    width:100vw;
+  }
+  #stars{position:fixed; inset:0; z-index:0;}
+
+  .app{
+    position:relative; z-index:1;
+    display:grid;
+    grid-template-columns: 1fr 380px;
+    grid-template-rows: auto 1fr;
+    height:100vh;
+    width:100vw;
+  }
+  header{
+    grid-column: 1 / 3;
+    display:flex; align-items:center; justify-content:space-between;
+    padding: 18px 26px;
+    border-bottom:1px solid var(--line);
+    background:rgba(6,8,16,0.55);
+    backdrop-filter: blur(6px);
+  }
+  .brand{display:flex; align-items:baseline; gap:12px;}
+  .brand .mark{
+    font-family:'Space Grotesk', sans-serif;
+    font-weight:700; font-size:20px; letter-spacing:0.02em;
+    color:var(--text);
+  }
+  .brand .mark span{color:var(--brass);}
+  .brand .sub{font-size:11px; color:var(--text-faint); letter-spacing:0.08em; text-transform:uppercase;}
+
+  .timectl{display:flex; align-items:center; gap:18px;}
+  .timectl .clock{font-size:12px; color:var(--text-dim); min-width:190px; text-align:right;}
+  .timectl .clock b{color:var(--brass); font-weight:600;}
+  button.iconbtn{
+    background:transparent; border:1px solid var(--line); color:var(--text);
+    width:34px; height:34px; border-radius:50%; cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+    font-size:13px; transition: border-color .15s, color .15s;
+  }
+  button.iconbtn:hover{border-color:var(--brass); color:var(--brass);}
+  .speedwrap{display:flex; align-items:center; gap:8px;}
+  .speedwrap label{font-size:10px; color:var(--text-faint); text-transform:uppercase; letter-spacing:.08em;}
+  input[type=range]{
+    -webkit-appearance:none; width:130px; height:2px; background:var(--line); border-radius:2px; outline:none;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none; width:12px; height:12px; border-radius:50%;
+    background:var(--brass); cursor:pointer; box-shadow:0 0 8px var(--brass-dim);
+  }
+  input[type=range]::-moz-range-thumb{
+    width:12px; height:12px; border-radius:50%; background:var(--brass); border:none; cursor:pointer;
+  }
+
+  main.stage{position:relative; overflow:hidden;}
+  #orrery{position:absolute; inset:0; display:block; cursor:grab;}
+
+  .legend{
+    position:absolute; left:22px; bottom:20px;
+    font-size:10px; color:var(--text-faint); line-height:1.6;
+    max-width:280px; letter-spacing:0.01em;
+    pointer-events:none;
+    transition:opacity .3s;
+  }
+
+  #zoomCloseBtn{
+    position:absolute; left:20px; top:20px;
+    opacity:0; pointer-events:none;
+    transition: opacity .25s;
+    z-index:3;
+    background:rgba(9,12,22,0.7);
+    backdrop-filter: blur(6px);
+  }
+  #zoomCloseBtn.visible{opacity:1; pointer-events:auto;}
+
+  aside{
+    border-left:1px solid var(--line);
+    background:var(--panel);
+    backdrop-filter: blur(8px);
+    overflow-y:auto;
+    display:flex; flex-direction:column;
+  }
+  .picker{
+    display:flex; flex-wrap:wrap; gap:6px;
+    padding:16px 18px; border-bottom:1px solid var(--line);
+  }
+  .chip{
+    display:flex; align-items:center; gap:6px;
+    background:rgba(255,255,255,0.03);
+    border:1px solid var(--line);
+    border-radius:20px; padding:5px 10px 5px 6px;
+    font-size:10.5px; color:var(--text-dim); cursor:pointer;
+    transition: all .15s;
+  }
+  .chip .dot{width:8px; height:8px; border-radius:50%; flex-shrink:0;}
+  .chip:hover{border-color:var(--brass-dim); color:var(--text);}
+  .chip.active{background:rgba(201,166,107,0.1); border-color:var(--brass); color:var(--text);}
+
+  .detail{padding:20px 20px 30px;}
+  .detail .name{
+    font-family:'Space Grotesk', sans-serif; font-size:26px; font-weight:700;
+  }
+  .detail .type{font-size:11px; color:var(--text-faint); text-transform:uppercase; letter-spacing:.1em; margin-top:2px; margin-bottom:18px;}
+
+  .instrument{
+    display:flex; align-items:center; justify-content:center;
+    gap:22px;
+    padding:18px 6px 22px;
+    border-top:1px solid var(--line);
+    border-bottom:1px solid var(--line);
+    margin-bottom:18px;
+  }
+  .sphere-box{
+    position:relative; width:104px; height:104px; flex-shrink:0;
+  }
+  .sphere-tilt{
+    position:absolute; inset:0; transform-origin:center center;
+  }
+  .sphere{
+    position:absolute; inset:0; border-radius:50%; overflow:hidden;
+    box-shadow: inset -14px -14px 26px rgba(0,0,0,0.55), inset 6px 6px 18px rgba(255,255,255,0.12);
+  }
+  .sphere .stripes{
+    position:absolute; inset:-2px;
+    background-size: 14px 100%;
+  }
+  .axis-line{
+    position:absolute; left:50%; top:-14px; bottom:-14px; width:1px;
+    background:linear-gradient(var(--brass), transparent, var(--brass));
+    opacity:0.75;
+  }
+  .axis-line::before, .axis-line::after{
+    content:''; position:absolute; left:50%; transform:translateX(-50%);
+    width:5px; height:5px; border-radius:50%; background:var(--brass);
+  }
+  .axis-line::before{top:-2px;} .axis-line::after{bottom:-2px;}
+
+  .tilt-readout{font-size:11px; color:var(--text-dim); line-height:1.9;}
+  .tilt-readout b{color:var(--brass); font-weight:600; font-size:13px;}
+  .tilt-readout .row{display:flex; justify-content:space-between; gap:14px; white-space:nowrap;}
+
+  .stats{display:flex; flex-direction:column; gap:0;}
+  .stat{
+    display:flex; justify-content:space-between; align-items:baseline;
+    padding:9px 0; border-bottom:1px solid rgba(255,255,255,0.05);
+    font-size:12px;
+  }
+  .stat .k{color:var(--text-faint); letter-spacing:.02em;}
+  .stat .v{color:var(--text); font-weight:600; text-align:right;}
+  .stat .v small{color:var(--text-dim); font-weight:400; margin-left:4px;}
+
+  .section-label{
+    font-size:10px; color:var(--brass); text-transform:uppercase; letter-spacing:.12em;
+    margin: 20px 0 8px;
+  }
+
+  .desc{font-size:11.5px; color:var(--text-dim); line-height:1.7; margin-top:16px;}
+
+  ::-webkit-scrollbar{width:6px;}
+  ::-webkit-scrollbar-thumb{background:var(--line); border-radius:3px;}
+
+  @media (max-width: 860px){
+    .app{grid-template-columns:1fr;}
+    aside{position:fixed; right:0; top:0; bottom:0; width:88vw; max-width:380px; transform:translateX(100%); transition:transform .25s; z-index:5;}
+    aside.open{transform:translateX(0);}
+  }
+</style>
+</head>
+<body>
+<canvas id="stars"></canvas>
+<div class="app">
+  <header>
+    <div class="brand">
+      <div class="mark">CELESTES <span>·</span> sistema solar</div>
+      <div class="sub">dados físicos reais</div>
+    </div>
+    <div class="timectl">
+      <div class="speedwrap">
+        <label>velocidade</label>
+        <input type="range" id="speedSlider" min="0" max="4" step="1" value="2">
+      </div>
+      <button class="iconbtn" id="playBtn" title="Pausar/Retomar">❙❙</button>
+      <div class="clock" id="clock">t = <b>0</b> dias simulados</div>
+    </div>
+  </header>
+  <main class="stage">
+    <canvas id="orrery"></canvas>
+    <button class="iconbtn" id="zoomCloseBtn" title="Voltar">✕</button>
+    <div class="legend" id="legend">
+      Role o scroll para dar zoom no sistema, arraste para navegar e clique duas vezes para reenquadrar. Clique em um corpo para aproximar e ver a curvatura que sua gravidade gera no espaço. Distâncias e tamanhos estão em escala não linear — os números no painel são os valores reais.
+    </div>
+  </main>
+  <aside>
+    <div class="picker" id="picker"></div>
+    <div class="detail" id="detail"></div>
+  </aside>
+</div>
+
+<script>
+/* ============ DADOS REAIS DOS CORPOS CELESTES ============
+   raioKm, massaKg, gravidadeSup (m/s²), rotHoras (negativo = retrógrada),
+   inclinacaoAxial (graus), distanciaAU, periodoOrbitalDias, velOrbitalKmS
+*/
+const SUN = {
+  key:'sun', nome:'Sol', tipo:'Estrela · G2V', cor:'#ffd27a',
+  raioKm:696000, massaKg:1.989e30, gravidadeSup:274.0,
+  rotHoras:609.12, inclinacaoAxial:7.25,
+  desc:'Estrela anã amarela que concentra 99,86% da massa do sistema solar. Sua rotação é diferencial: o equador gira mais rápido (~25 dias) que os polos (~35 dias); usamos aqui o período equatorial.'
+};
+
+const BODIES = [
+  {key:'mercury', nome:'Mercúrio', tipo:'Planeta rochoso', cor:'#9c9c98',
+   raioKm:2439.7, massaKg:3.3011e23, gravidadeSup:3.70,
+   rotHoras:1407.6, inclinacaoAxial:0.034,
+   distanciaAU:0.387, periodoOrbitalDias:87.97, velOrbitalKmS:47.36,
+   desc:'O menor planeta e o mais próximo do Sol. Está em ressonância orbital-rotacional 3:2 — gira 3 vezes no eixo a cada 2 voltas ao redor do Sol.'},
+
+  {key:'venus', nome:'Vênus', tipo:'Planeta rochoso', cor:'#e8cf9e',
+   raioKm:6051.8, massaKg:4.8675e24, gravidadeSup:8.87,
+   rotHoras:-5832.5, inclinacaoAxial:177.4,
+   distanciaAU:0.723, periodoOrbitalDias:224.70, velOrbitalKmS:35.02,
+   desc:'Gira ao contrário dos demais planetas (rotação retrógrada) e tão lentamente que seu dia (243 dias terrestres) é mais longo que seu ano.'},
+
+  {key:'earth', nome:'Terra', tipo:'Planeta rochoso', cor:'#3d7ea6',
+   raioKm:6371.0, massaKg:5.972e24, gravidadeSup:9.807,
+   rotHoras:23.934, inclinacaoAxial:23.44,
+   distanciaAU:1.000, periodoOrbitalDias:365.25, velOrbitalKmS:29.78,
+   desc:'Nosso planeta de referência. A inclinação axial de 23,44° é responsável pelas estações do ano.'},
+
+  {key:'mars', nome:'Marte', tipo:'Planeta rochoso', cor:'#c1440e',
+   raioKm:3389.5, massaKg:6.4171e23, gravidadeSup:3.721,
+   rotHoras:24.623, inclinacaoAxial:25.19,
+   distanciaAU:1.524, periodoOrbitalDias:686.98, velOrbitalKmS:24.07,
+   desc:'Dia (24h37min) e inclinação axial muito parecidos com os da Terra, o que também lhe dá estações do ano bem marcadas.'},
+
+  {key:'jupiter', nome:'Júpiter', tipo:'Gigante gasoso', cor:'#c9975f',
+   raioKm:69911, massaKg:1.8982e27, gravidadeSup:24.79,
+   rotHoras:9.925, inclinacaoAxial:3.13,
+   distanciaAU:5.203, periodoOrbitalDias:4332.6, velOrbitalKmS:13.07,
+   desc:'O maior planeta e o de rotação mais rápida do sistema solar: um dia inteiro dura menos de 10 horas.'},
+
+  {key:'saturn', nome:'Saturno', tipo:'Gigante gasoso', cor:'#e3c887', anel:true,
+   raioKm:58232, massaKg:5.6834e26, gravidadeSup:10.44,
+   rotHoras:10.656, inclinacaoAxial:26.73,
+   distanciaAU:9.537, periodoOrbitalDias:10759, velOrbitalKmS:9.68,
+   desc:'É o único planeta menos denso que a água. Seus icônicos anéis são compostos majoritariamente de gelo e rocha.'},
+
+  {key:'uranus', nome:'Urano', tipo:'Gigante de gelo', cor:'#9fe3e8',
+   raioKm:25362, massaKg:8.6810e25, gravidadeSup:8.69,
+   rotHoras:-17.24, inclinacaoAxial:97.77,
+   distanciaAU:19.19, periodoOrbitalDias:30688.5, velOrbitalKmS:6.80,
+   desc:'Gira praticamente "deitado": com 97,77° de inclinação axial, seu eixo de rotação aponta quase para o Sol.'},
+
+  {key:'neptune', nome:'Netuno', tipo:'Gigante de gelo', cor:'#5170f2',
+   raioKm:24622, massaKg:1.02413e26, gravidadeSup:11.15,
+   rotHoras:16.11, inclinacaoAxial:28.32,
+   distanciaAU:30.07, periodoOrbitalDias:60195, velOrbitalKmS:5.43,
+   desc:'O planeta mais distante do Sol tem os ventos mais fortes já registrados no sistema solar, ultrapassando 2000 km/h.'}
+];
+
+/* ============ LUAS DOS GIGANTES GASOSOS/GELO ============
+   Cada lua traz dados reais quando conhecidos. Luas pequenas e irregulares muitas vezes
+   não têm massa medida diretamente — nesses casos (estimado:true) a massa é calculada a
+   partir do raio assumindo uma densidade típica de corpo gelado/rochoso, apenas para dar
+   uma gravidade de referência; o raio, a distância e o período orbital são sempre reais.
+   tidalLocked:true = rotação sincronizada com a órbita (como a nossa Lua); nesses casos a
+   inclinação axial em relação à própria órbita é ~0°. Luas irregulares (capturadas) têm
+   rotação caótica/não determinada.
+*/
+const MOONS = {
+  jupiter: [
+    {nome:'Io', raioKm:1821.6, massaKg:8.9319e22, distanciaKm:421700, periodoOrbitalDias:1.769, tidalLocked:true, grupo:'galileana', destaque:true, descoberta:1610, cor:'#e0c34a',
+     desc:'A lua mais vulcanicamente ativa do sistema solar — o esticamento gravitacional de Júpiter gera fricção interna intensa (aquecimento de maré) que alimenta centenas de vulcões.'},
+    {nome:'Europa', raioKm:1560.8, massaKg:4.7998e22, distanciaKm:671034, periodoOrbitalDias:3.551, tidalLocked:true, grupo:'galileana', destaque:true, descoberta:1610, cor:'#e8e4d8',
+     desc:'Uma crosta de gelo cobre um oceano líquido global, um dos lugares mais promissores para buscar vida fora da Terra.'},
+    {nome:'Ganimedes', raioKm:2634.1, massaKg:1.4819e23, distanciaKm:1070412, periodoOrbitalDias:7.155, tidalLocked:true, grupo:'galileana', destaque:true, descoberta:1610, cor:'#9a8c78',
+     desc:'A maior lua do sistema solar, maior até que o planeta Mercúrio, e a única lua conhecida com campo magnético próprio.'},
+    {nome:'Calisto', raioKm:2410.3, massaKg:1.0759e23, distanciaKm:1882709, periodoOrbitalDias:16.689, tidalLocked:true, grupo:'galileana', destaque:true, descoberta:1610, cor:'#6b6259',
+     desc:'A mais antiga e crateirada superfície do sistema solar — praticamente um fóssil geológico de 4 bilhões de anos.'}
+  ]
+};
+
+/* completa dados derivados de cada lua: massa estimada (quando necessário) e gravidade real */
+const G_EARTH = 9.807;
+const G_CONST = 6.674e-11;
+Object.values(MOONS).forEach(list=>{
+  list.forEach(m=>{
+    if(m.estimado || !m.massaKg){
+      const densidade = 1500; // kg/m³, densidade típica de corpo gelado/misto
+      const raioM = m.raioKm*1000;
+      m.massaKg = densidade*(4/3)*Math.PI*Math.pow(raioM,3);
+      m.estimado = true;
+    }
+    m.gravidadeSup = G_CONST*m.massaKg/Math.pow(m.raioKm*1000,2);
+    if(!m.cor) m.cor = m.grupo==='galileana' ? '#d8d2c4' : (m.grupo==='irregular' ? '#8f97a3' : '#b7bcc2');
+    if(!m.desc){
+      m.desc = m.tidalLocked
+        ? 'Lua regular, com rotação sincronizada ao redor do planeta — sempre mostra a mesma face, assim como a nossa Lua faz com a Terra.'
+        : 'Lua irregular, provavelmente capturada pela gravidade do planeta; orbita a grande distância, em rota inclinada e sua rotação não é sincronizada.';
+    }
+  });
+});
+const EARTH_MASS = BODIES.find(b=>b.key==='earth').massaKg;
+
+function rotEquatorSpeedKmH(raioKm, rotHoras){
+  const circ = 2*Math.PI*raioKm;
+  return circ/Math.abs(rotHoras);
+}
+function clamp(v,a,b){ return Math.max(a,Math.min(b,v)); }
+function easeInOutCubic(t){ return t<0.5 ? 4*t*t*t : 1-Math.pow(-2*t+2,3)/2; }
+
+function shade(hex, percent){
+  let f=parseInt(hex.slice(1),16), t=percent<0?0:255, p=percent<0?-percent:percent;
+  let R=f>>16, G=(f>>8)&0x00FF, B=f&0x0000FF;
+  return "#"+(0x1000000+(Math.round((t-R)*p)+R)*0x10000+(Math.round((t-G)*p)+G)*0x100+(Math.round((t-B)*p)+B)).toString(16).slice(1);
+}
+
+/* ============ ESTRELAS DE FUNDO ============ */
+const starsCanvas = document.getElementById('stars');
+const sctx = starsCanvas.getContext('2d');
+let starField = [];
+function resizeStars(){
+  starsCanvas.width = innerWidth; starsCanvas.height = innerHeight;
+  starField = [];
+  for(let i=0;i<260;i++){
+    starField.push({
+      x:Math.random()*innerWidth, y:Math.random()*innerHeight,
+      r:Math.random()*1.1+0.2,
+      base:Math.random()*0.5+0.15,
+      phase:Math.random()*Math.PI*2,
+      speed:Math.random()*0.6+0.2
+    });
+  }
+}
+function drawStars(tsec){
+  sctx.clearRect(0,0,innerWidth,innerHeight);
+  starField.forEach(s=>{
+    const a = s.base + Math.sin(tsec*s.speed + s.phase)*0.18;
+    sctx.beginPath();
+    sctx.fillStyle=`rgba(255,255,255,${clamp(a,0,1).toFixed(2)})`;
+    sctx.arc(s.x,s.y,s.r,0,7);
+    sctx.fill();
+  });
+}
+resizeStars();
+window.addEventListener('resize', resizeStars);
+
+/* ============ CANVAS DO ORRERY ============ */
+const cv = document.getElementById('orrery');
+const ctx = cv.getContext('2d');
+let W,H,CX,CY, ORBIT_SCALE;
+function resizeOrrery(){
+  const stage = cv.parentElement.getBoundingClientRect();
+  W = cv.width = stage.width; H = cv.height = stage.height;
+  CX = W/2; CY = H/2;
+  const maxAU = Math.sqrt(BODIES[BODIES.length-1].distanciaAU);
+  const pad = 46;
+  ORBIT_SCALE = (Math.min(W,H)/2 - pad) / maxAU;
+}
+resizeOrrery();
+window.addEventListener('resize', resizeOrrery);
+
+function orbitPx(AU){ return Math.sqrt(AU) * ORBIT_SCALE; }
+function planetPx(raioKm){ return Math.max(3.2, Math.min(13, Math.log10(raioKm)*3.1 - 6)); }
+
+/* ============ ESTADO / TEMPO ============ */
+let simDays = 0;
+let playing = true;
+const speedTable = [4, 20, 80, 400, 2000];
+let speedIdx = 2;
+let selected = 'earth';
+let selectedMoon = null; // {planetKey, index} quando uma lua está sendo exibida
+let lastT = null;
+
+const zoomState = { key:null, t:0, targetT:0 };
+const moonZoom = { idx:null, t:0, targetT:0 };
+let activeMoonDots = []; // posições na tela das luas visíveis, recalculadas a cada frame para clique
+let systemMoonDots = []; // luas visíveis diretamente no sistema (zoom livre com scroll)
+const MOON_REVEAL_SCALE = 2.6; // scale da câmera a partir do qual as luas ficam visíveis
+const MOON_FADE_RANGE = 1.3;   // faixa de transição suave do fade-in
+const camera = { scale:1, x:0, y:0 };
+
+function toScreen(x,y){
+  return { x: CX+camera.x+(x-CX)*camera.scale, y: CY+camera.y+(y-CY)*camera.scale };
+}
+
+function angleFor(periodDays){
+  return (simDays/periodDays) * 2*Math.PI;
+}
+
+function getBodyScreenPos(b){
+  if(b.key==='sun') return {x:CX, y:CY, pr:15};
+  const rr = orbitPx(b.distanciaAU);
+  const ang = angleFor(b.periodoOrbitalDias);
+  const x = CX + Math.cos(ang)*rr;
+  const y = CY + Math.sin(ang)*rr*0.62;
+  return {x, y, pr: planetPx(b.raioKm)};
+}
+
+function getBodyViewPos(b){
+  const p = getBodyScreenPos(b);
+  const s = toScreen(p.x, p.y);
+  return { x:s.x, y:s.y, pr: p.pr*camera.scale };
+}
+
+function drawFullSystem(){
+  BODIES.forEach(b=>{
+    const r = orbitPx(b.distanciaAU);
+    ctx.beginPath();
+    ctx.strokeStyle = b.key===selected ? 'rgba(201,166,107,0.45)' : 'rgba(255,255,255,0.08)';
+    ctx.lineWidth = b.key===selected ? 1.4 : 1;
+    if(b.distanciaAU>6) ctx.setLineDash([2,4]); else ctx.setLineDash([]);
+    ctx.ellipse(CX,CY, r, r*0.62, 0, 0, Math.PI*2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  });
+
+  const sunR = 15;
+  const pulse = 1 + Math.sin(performance.now()/900)*0.04;
+  const outerGlow = ctx.createRadialGradient(CX,CY,0,CX,CY,sunR*4.2*pulse);
+  outerGlow.addColorStop(0,'rgba(255,225,160,0.35)');
+  outerGlow.addColorStop(0.4,'rgba(255,190,110,0.12)');
+  outerGlow.addColorStop(1,'rgba(255,150,60,0)');
+  ctx.beginPath(); ctx.fillStyle=outerGlow; ctx.arc(CX,CY,sunR*4.2*pulse,0,Math.PI*2); ctx.fill();
+
+  const coreGrad = ctx.createRadialGradient(CX-sunR*0.3,CY-sunR*0.3,1,CX,CY,sunR*1.1);
+  coreGrad.addColorStop(0,'#fff6e0');
+  coreGrad.addColorStop(0.5,'#ffdf9e');
+  coreGrad.addColorStop(1,'#ffb75e');
+  ctx.beginPath(); ctx.fillStyle=coreGrad; ctx.arc(CX,CY,sunR,0,Math.PI*2); ctx.fill();
+
+  BODIES.forEach(b=>{
+    const {x,y,pr} = getBodyScreenPos(b);
+    const isSel = b.key===selected;
+
+    if(b.anel){
+      const ringGrad = ctx.createLinearGradient(x-pr*2,y,x+pr*2,y);
+      ringGrad.addColorStop(0,'rgba(227,200,135,0.15)');
+      ringGrad.addColorStop(0.5,'rgba(227,200,135,0.6)');
+      ringGrad.addColorStop(1,'rgba(227,200,135,0.15)');
+      ctx.beginPath();
+      ctx.strokeStyle=ringGrad;
+      ctx.lineWidth=2.6;
+      ctx.ellipse(x,y,pr*2.05,pr*0.75,0,0,Math.PI*2);
+      ctx.stroke();
+    }
+
+    if(isSel){
+      ctx.beginPath();
+      ctx.strokeStyle='rgba(201,166,107,0.9)';
+      ctx.lineWidth=1.4;
+      ctx.arc(x,y,pr+6,0,Math.PI*2);
+      ctx.stroke();
+    }
+
+    const pg = ctx.createRadialGradient(x-pr*0.35,y-pr*0.35,pr*0.1, x,y,pr*1.2);
+    pg.addColorStop(0, shade(b.cor,0.45));
+    pg.addColorStop(0.55, b.cor);
+    pg.addColorStop(1, shade(b.cor,-0.55));
+    ctx.beginPath();
+    ctx.fillStyle=pg;
+    ctx.shadowColor=b.cor; ctx.shadowBlur= isSel?16:5;
+    ctx.arc(x,y,pr,0,Math.PI*2);
+    ctx.fill();
+    ctx.shadowBlur=0;
+
+    ctx.font = (isSel?"600 ":"400 ")+"10px 'JetBrains Mono', monospace";
+    ctx.fillStyle= isSel? '#e9e6de' : 'rgba(233,230,222,0.55)';
+    ctx.fillText(b.nome, x+pr+7, y+3);
+
+    /* luas visíveis quando o zoom livre (scroll) se aproxima o bastante do planeta */
+    const moonList = MOONS[b.key];
+    if(moonList){
+      const revealAlpha = clamp((camera.scale - (MOON_REVEAL_SCALE-MOON_FADE_RANGE))/MOON_FADE_RANGE, 0, 1);
+      if(revealAlpha>0.01){
+        moonList.forEach((m,i)=>{
+          const orbitR = pr*1.7 + i*(pr*0.65);
+          const ang = angleFor(Math.abs(m.periodoOrbitalDias)) * (m.periodoOrbitalDias<0?-1:1);
+          const mx = x + Math.cos(ang)*orbitR;
+          const my = y + Math.sin(ang)*orbitR*0.55;
+          const dotR = pr*0.16;
+          const isMoonSel = selectedMoon && selectedMoon.planetKey===b.key && selectedMoon.idx===i;
+
+          ctx.save();
+          ctx.globalAlpha = revealAlpha*0.4;
+          ctx.beginPath();
+          ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+          ctx.lineWidth = 0.6;
+          ctx.ellipse(x, y, orbitR, orbitR*0.55, 0, 0, Math.PI*2);
+          ctx.stroke();
+          ctx.restore();
+
+          ctx.save();
+          ctx.globalAlpha = revealAlpha;
+          ctx.beginPath();
+          ctx.fillStyle = m.cor;
+          ctx.shadowColor = m.cor; ctx.shadowBlur = isMoonSel?10:2;
+          ctx.arc(mx,my,dotR,0,Math.PI*2);
+          ctx.fill();
+          ctx.shadowBlur=0;
+          if(revealAlpha>0.6){
+            ctx.font = "9px 'JetBrains Mono', monospace";
+            ctx.fillStyle = 'rgba(233,230,222,0.7)';
+            ctx.fillText(m.nome, mx+dotR+4, my+3);
+          }
+          ctx.restore();
+
+          if(revealAlpha>0.3){
+            const screenPos = toScreen(mx,my);
+            systemMoonDots.push({planetKey:b.key, idx:i, x:screenPos.x, y:screenPos.y, r:Math.max(dotR*camera.scale, 9), nome:m.nome});
+          }
+        });
+      }
+    }
+  });
+}
+
+/* ============ MALHA DE DISTORÇÃO GRAVITACIONAL ============ */
+function drawGravityWell(cx, cy, body, radiusPx, alpha){
+  // Escala fiel ao campo real: usamos log10(massa/massa da Terra) porque a razão de
+  // massas no sistema solar é enorme (o Sol tem ~333.000x a massa da Terra) — uma escala
+  // linear tornaria tudo imperceptível exceto o Sol. O log preserva a ordem real de
+  // "peso" gravitacional entre os corpos mantendo tudo visível na mesma cena.
+  const massRel = body.massaKg / EARTH_MASS;
+  const massIndex = Math.log10(massRel + 1); // 0 (corpos leves) a ~5.5 (Sol)
+
+  const wellDepth = clamp(9 + massIndex*23, 9, 145);
+  // corpos mais massivos também curvam uma região maior ao redor deles, não só mais fundo
+  const wellWidth = radiusPx * (1.5 + massIndex*0.34);
+  const halfExtent = radiusPx * (5.2 + massIndex*0.9);
+  const N = 13;
+  const steps = 50;
+  const tiltY = 0.5;
+  // corpos mais densos/massivos têm queda mais íngreme perto do centro (poço mais "fechado")
+  const falloffPow = 1.7 + Math.min(massIndex*0.22, 1.1);
+
+  function depthAt(gx,gy){
+    const r = Math.hypot(gx,gy);
+    return wellDepth / (1 + Math.pow(r/wellWidth, falloffPow));
+  }
+
+  ctx.save();
+  ctx.globalAlpha = alpha;
+
+  for(let iy=-Math.floor(N/2); iy<=Math.floor(N/2); iy++){
+    const gy = iy*(halfExtent*2/N);
+    ctx.beginPath();
+    for(let ix=0; ix<=steps; ix++){
+      const gx = -halfExtent + (ix/steps)*halfExtent*2;
+      const d = depthAt(gx,gy);
+      const sx = cx+gx;
+      const sy = cy + gy*tiltY + d;
+      if(ix===0) ctx.moveTo(sx,sy); else ctx.lineTo(sx,sy);
+    }
+    ctx.strokeStyle = 'rgba(95,195,180,0.4)';
+    ctx.lineWidth=1;
+    ctx.stroke();
+  }
+  for(let ix=-Math.floor(N/2); ix<=Math.floor(N/2); ix++){
+    const gx = ix*(halfExtent*2/N);
+    ctx.beginPath();
+    for(let iy=0; iy<=steps; iy++){
+      const gy = -halfExtent + (iy/steps)*halfExtent*2;
+      const d = depthAt(gx,gy);
+      const sx = cx+gx;
+      const sy = cy + gy*tiltY + d;
+      if(iy===0) ctx.moveTo(sx,sy); else ctx.lineTo(sx,sy);
+    }
+    ctx.strokeStyle = 'rgba(201,166,107,0.32)';
+    ctx.lineWidth=1;
+    ctx.stroke();
+  }
+  ctx.restore();
+  return wellDepth;
+}
+
+let lastMoonDotPos = {};
+
+function drawZoomedScene(key, tRaw){
+  const body = key==='sun' ? SUN : BODIES.find(b=>b.key===key);
+  const orig = getBodyViewPos(body);
+  const t = easeInOutCubic(tRaw);
+  const fadeMoonTakeover = 1 - moonZoom.t; // dá lugar à cena da lua quando ela é aberta
+
+  const cx = orig.x + (CX-orig.x)*t;
+  const cy = orig.y + (CY-orig.y)*t;
+  const targetR = Math.min(W,H)*0.15;
+  const radius = orig.pr + (targetR-orig.pr)*t;
+
+  const wellDepth = drawGravityWell(cx, cy, body, radius, t*fadeMoonTakeover);
+
+  const planetY = cy + wellDepth*0.4*t;
+  const pg = ctx.createRadialGradient(cx-radius*0.35, planetY-radius*0.35, radius*0.1, cx, planetY, radius*1.15);
+  pg.addColorStop(0, shade(body.cor,0.5));
+  pg.addColorStop(0.55, body.cor);
+  pg.addColorStop(1, shade(body.cor,-0.6));
+  ctx.save();
+  ctx.globalAlpha = t*fadeMoonTakeover;
+  ctx.beginPath();
+  ctx.fillStyle = pg;
+  ctx.shadowColor = body.cor; ctx.shadowBlur = 26;
+  ctx.arc(cx, planetY, radius, 0, Math.PI*2);
+  ctx.fill();
+  ctx.shadowBlur = 0;
+
+  if(body.anel){
+    const ringGrad = ctx.createLinearGradient(cx-radius*2.1,planetY,cx+radius*2.1,planetY);
+    ringGrad.addColorStop(0,'rgba(227,200,135,0.1)');
+    ringGrad.addColorStop(0.5,'rgba(227,200,135,0.55)');
+    ringGrad.addColorStop(1,'rgba(227,200,135,0.1)');
+    ctx.beginPath();
+    ctx.strokeStyle=ringGrad;
+    ctx.lineWidth=radius*0.09;
+    ctx.ellipse(cx,planetY,radius*2.15,radius*0.8,0,0,Math.PI*2);
+    ctx.stroke();
+  }
+
+  if(tRaw>0.7){
+    const labelAlpha = (tRaw-0.7)/0.3*fadeMoonTakeover;
+    ctx.globalAlpha = labelAlpha;
+    ctx.textAlign='center';
+    ctx.font = "600 15px 'Space Grotesk', sans-serif";
+    ctx.fillStyle = '#e9e6de';
+    ctx.fillText(body.nome, cx, planetY+radius+34);
+    ctx.font = "11px 'JetBrains Mono', monospace";
+    ctx.fillStyle = 'rgba(233,230,222,0.6)';
+    ctx.fillText(`gravidade ${body.gravidadeSup.toFixed(2)} m/s²  ·  inclinação ${body.inclinacaoAxial.toFixed(1)}°`, cx, planetY+radius+52);
+    ctx.textAlign='left';
+  }
+  ctx.restore();
+
+  // luas principais orbitando visivelmente ao redor do planeta
+  const moonList = MOONS[key];
+  if(moonList && tRaw>0.4){
+    const featured = moonList.map((m,i)=>({...m, idx:i})).filter(m=>m.destaque);
+    const moonAlpha = Math.min(1,(tRaw-0.4)/0.3) * fadeMoonTakeover;
+    featured.forEach((m,i)=>{
+      const orbitR = radius*1.55 + i*(radius*0.62);
+      const ang = angleFor(Math.abs(m.periodoOrbitalDias)) * (m.periodoOrbitalDias<0?-1:1);
+      const mx = cx + Math.cos(ang)*orbitR;
+      const my = planetY + Math.sin(ang)*orbitR*0.5;
+      const dotR = Math.max(3, Math.min(7, Math.log10(m.raioKm)*2));
+
+      ctx.save();
+      ctx.globalAlpha = moonAlpha*0.35;
+      ctx.beginPath();
+      ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+      ctx.lineWidth = 1;
+      ctx.ellipse(cx, planetY, orbitR, orbitR*0.5, 0, 0, Math.PI*2);
+      ctx.stroke();
+      ctx.restore();
+
+      ctx.save();
+      ctx.globalAlpha = moonAlpha;
+      ctx.beginPath();
+      ctx.fillStyle = m.cor;
+      ctx.shadowColor = m.cor; ctx.shadowBlur = selectedMoon && selectedMoon.planetKey===key && selectedMoon.idx===m.idx ? 14 : 3;
+      ctx.arc(mx,my,dotR,0,Math.PI*2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.font = "9px 'JetBrains Mono', monospace";
+      ctx.fillStyle = 'rgba(233,230,222,0.7)';
+      ctx.fillText(m.nome, mx+dotR+5, my+3);
+      ctx.restore();
+
+      if(moonAlpha>0.5){
+        activeMoonDots.push({planetKey:key, idx:m.idx, x:mx, y:my, r:Math.max(dotR,9), nome:m.nome});
+        lastMoonDotPos[key+'_'+m.idx] = {x:mx, y:my, pr:dotR};
+      }
+    });
+  }
+}
+
+function drawMoonZoomedScene(planetKey, idx, tRaw){
+  if(idx===null || idx===undefined) return;
+  const m = MOONS[planetKey][idx];
+  const cache = lastMoonDotPos[planetKey+'_'+idx];
+  const origX = cache ? cache.x : CX;
+  const origY = cache ? cache.y : CY;
+  const origR = cache ? cache.pr : 4;
+  const t = easeInOutCubic(tRaw);
+
+  const cx = origX + (CX-origX)*t;
+  const cy = origY + (CY-origY)*t;
+  const targetR = Math.min(W,H)*0.12;
+  const radius = origR + (targetR-origR)*t;
+
+  const wellDepth = drawGravityWell(cx, cy, m, radius, t);
+  const bodyY = cy + wellDepth*0.4*t;
+
+  const pg = ctx.createRadialGradient(cx-radius*0.35, bodyY-radius*0.35, radius*0.1, cx, bodyY, radius*1.15);
+  pg.addColorStop(0, shade(m.cor,0.5));
+  pg.addColorStop(0.55, m.cor);
+  pg.addColorStop(1, shade(m.cor,-0.6));
+  ctx.save();
+  ctx.globalAlpha = t;
+  ctx.beginPath();
+  ctx.fillStyle = pg;
+  ctx.shadowColor = m.cor; ctx.shadowBlur = 22;
+  ctx.arc(cx, bodyY, radius, 0, Math.PI*2);
+  ctx.fill();
+  ctx.shadowBlur = 0;
+
+  if(tRaw>0.7){
+    const labelAlpha = (tRaw-0.7)/0.3;
+    ctx.globalAlpha = labelAlpha;
+    ctx.textAlign='center';
+    ctx.font = "600 15px 'Space Grotesk', sans-serif";
+    ctx.fillStyle = '#e9e6de';
+    ctx.fillText(m.nome, cx, bodyY+radius+34);
+    ctx.font = "11px 'JetBrains Mono', monospace";
+    ctx.fillStyle = 'rgba(233,230,222,0.6)';
+    ctx.fillText(`gravidade ${m.gravidadeSup.toFixed(3)} m/s²`, cx, bodyY+radius+52);
+    ctx.textAlign='left';
+  }
+  ctx.restore();
+}
+
+function draw(){
+  ctx.clearRect(0,0,W,H);
+  activeMoonDots = [];
+  systemMoonDots = [];
+  const t = zoomState.t;
+  const fadeFull = 1-t;
+  if(fadeFull>0.01){
+    ctx.save();
+    ctx.globalAlpha = fadeFull;
+    ctx.translate(CX+camera.x, CY+camera.y);
+    ctx.scale(camera.scale, camera.scale);
+    ctx.translate(-CX, -CY);
+    drawFullSystem();
+    ctx.restore();
+  }
+  if(t>0.01 && zoomState.key){
+    drawZoomedScene(zoomState.key, t);
+  }
+  if(moonZoom.t>0.01 && zoomState.key){
+    drawMoonZoomedScene(zoomState.key, moonZoom.idx, moonZoom.t);
+  }
+}
+
+function tick(t){
+  if(lastT===null) lastT=t;
+  const dt = (t-lastT)/1000; lastT=t;
+  if(playing){ simDays += dt*speedTable[speedIdx]; }
+
+  zoomState.t += (zoomState.targetT - zoomState.t) * Math.min(1, dt*5);
+  if(Math.abs(zoomState.targetT-zoomState.t)<0.001) zoomState.t = zoomState.targetT;
+  moonZoom.t += (moonZoom.targetT - moonZoom.t) * Math.min(1, dt*5);
+  if(Math.abs(moonZoom.targetT-moonZoom.t)<0.001) moonZoom.t = moonZoom.targetT;
+
+  draw();
+  drawStars(t/1000);
+  updateInstrument();
+  document.getElementById('clock').innerHTML = `t = <b>${simDays.toFixed(1)}</b> dias simulados`;
+  document.getElementById('legend').style.opacity = zoomState.t>0.3 ? 0 : 1;
+  document.getElementById('zoomCloseBtn').classList.toggle('visible', zoomState.targetT>0.3);
+  requestAnimationFrame(tick);
+}
+requestAnimationFrame(tick);
+
+function zoomIn(key){ zoomState.key = key; zoomState.targetT = 1; }
+function zoomOut(){
+  if(moonZoom.targetT>0.3){ moonZoom.targetT = 0; selectedMoon=null; renderDetail(); return; }
+  zoomState.targetT = 0;
+}
+
+document.getElementById('zoomCloseBtn').addEventListener('click', zoomOut);
+
+function screenToWorld(mx,my){
+  return {
+    x: CX + (mx - CX - camera.x)/camera.scale,
+    y: CY + (my - CY - camera.y)/camera.scale
+  };
+}
+
+function handleCanvasClick(e){
+  const rect = cv.getBoundingClientRect();
+  const mx = e.clientX-rect.left, my = e.clientY-rect.top;
+
+  if(moonZoom.targetT>0.3){ zoomOut(); return; }
+
+  if(zoomState.targetT>0.3){
+    let bestMoon=null, bmd=99999;
+    activeMoonDots.forEach(d=>{
+      const dist = Math.hypot(mx-d.x,my-d.y);
+      if(dist<d.r && dist<bmd){bmd=dist; bestMoon=d;}
+    });
+    if(bestMoon){ selectMoon(bestMoon.planetKey, bestMoon.idx); return; }
+    zoomOut();
+    return;
+  }
+
+  let best=null, bd=99999;
+  let bestSysMoon=null, bsmd=99999;
+  systemMoonDots.forEach(d=>{
+    const dist = Math.hypot(mx-d.x,my-d.y);
+    if(dist<d.r && dist<bsmd){bsmd=dist; bestSysMoon=d;}
+  });
+  if(bestSysMoon){ selectMoonInfo(bestSysMoon.planetKey, bestSysMoon.idx); return; }
+
+  BODIES.forEach(b=>{
+    const v = getBodyViewPos(b);
+    const d = Math.hypot(mx-v.x,my-v.y);
+    if(d<bd){bd=d;best=b.key;}
+  });
+  const sunView = toScreen(CX,CY);
+  const dSun = Math.hypot(mx-sunView.x,my-sunView.y);
+  if(dSun<20*camera.scale && dSun<bd){ best='sun'; }
+  if(best){ selectBody(best); }
+}
+
+/* zoom com scroll do mouse, centralizado no cursor */
+cv.addEventListener('wheel', (e)=>{
+  if(zoomState.targetT>0.3) return;
+  e.preventDefault();
+  const rect = cv.getBoundingClientRect();
+  const mx = e.clientX-rect.left, my = e.clientY-rect.top;
+  const world = screenToWorld(mx,my);
+  const factor = Math.exp(-e.deltaY*0.0015);
+  const newScale = clamp(camera.scale*factor, 0.5, 7);
+  camera.x = mx - CX - (world.x-CX)*newScale;
+  camera.y = my - CY - (world.y-CY)*newScale;
+  camera.scale = newScale;
+}, {passive:false});
+
+/* arrastar para navegar pelo sistema; clique curto (sem arrastar) seleciona um corpo */
+let isDragging=false, dragStart=null, camStart=null, dragMoved=0;
+cv.addEventListener('mousedown', (e)=>{
+  if(zoomState.targetT>0.3) return;
+  isDragging=true; dragMoved=0;
+  const rect = cv.getBoundingClientRect();
+  dragStart = {x:e.clientX-rect.left, y:e.clientY-rect.top};
+  camStart = {x:camera.x, y:camera.y};
+  cv.style.cursor='grabbing';
+});
+window.addEventListener('mousemove', (e)=>{
+  if(!isDragging) return;
+  const rect = cv.getBoundingClientRect();
+  const mx = e.clientX-rect.left, my = e.clientY-rect.top;
+  const dx = mx-dragStart.x, dy = my-dragStart.y;
+  dragMoved = Math.hypot(dx,dy);
+  camera.x = camStart.x+dx;
+  camera.y = camStart.y+dy;
+});
+window.addEventListener('mouseup', (e)=>{
+  if(!isDragging) return;
+  isDragging=false;
+  cv.style.cursor='grab';
+  if(dragMoved<4){ handleCanvasClick(e); }
+});
+
+/* duplo clique reseta o enquadramento */
+cv.addEventListener('dblclick', ()=>{
+  if(zoomState.targetT>0.3) return;
+  camera.scale=1; camera.x=0; camera.y=0;
+});
+
+/* ============ CONTROLES ============ */
+document.getElementById('playBtn').addEventListener('click', (e)=>{
+  playing=!playing;
+  e.target.textContent = playing? '❙❙' : '▶';
+});
+document.getElementById('speedSlider').addEventListener('input', (e)=>{
+  speedIdx = +e.target.value;
+});
+
+/* ============ PAINEL LATERAL ============ */
+const picker = document.getElementById('picker');
+function buildPicker(){
+  const all = [SUN, ...BODIES];
+  picker.innerHTML = all.map(b=>`
+    <div class="chip" data-key="${b.key}">
+      <span class="dot" style="background:${b.cor}"></span>${b.nome}
+    </div>`).join('');
+  picker.querySelectorAll('.chip').forEach(c=>{
+    c.addEventListener('click', ()=>selectBody(c.dataset.key));
+  });
+}
+buildPicker();
+
+function fmt(n, d=2){
+  return Number(n).toLocaleString('pt-BR', {maximumFractionDigits:d, minimumFractionDigits:0});
+}
+
+function selectBody(key, initial){
+  const wasZoomedOnThis = zoomState.targetT>0.3 && zoomState.key===key;
+  selected = key;
+  selectedMoon = null;
+  document.querySelectorAll('.chip').forEach(c=>c.classList.toggle('active', c.dataset.key===key));
+  renderDetail();
+  if(initial) return;
+  if(wasZoomedOnThis){ zoomOut(); } else { zoomIn(key); }
+}
+
+function selectMoon(planetKey, idx){
+  selectedMoon = {planetKey, idx};
+  moonZoom.idx = idx;
+  moonZoom.targetT = 1;
+  renderDetail();
+}
+function backToPlanet(){
+  selectedMoon = null;
+  moonZoom.targetT = 0;
+  renderDetail();
+}
+
+/* clique numa lua vista diretamente no sistema (zoom livre com scroll): só mostra as
+   informações no painel, sem mexer na câmera nem acionar a cena de poço gravitacional */
+function selectMoonInfo(planetKey, idx){
+  selected = planetKey;
+  selectedMoon = {planetKey, idx};
+  document.querySelectorAll('.chip').forEach(c=>c.classList.toggle('active', c.dataset.key===planetKey));
+  renderDetail();
+}
+
+function moonGroupLabel(g){
+  if(g==='galileana') return 'Luas galileanas';
+  if(g==='anel') return 'Luas internas / de anel';
+  if(g==='regular') return 'Luas regulares';
+  return 'Luas irregulares (capturadas)';
+}
+
+function buildMoonPickerHTML(planetKey){
+  const list = MOONS[planetKey];
+  if(!list) return '';
+  const groups = {};
+  list.forEach((m,i)=>{
+    (groups[m.grupo] = groups[m.grupo]||[]).push({...m, idx:i});
+  });
+  const order = ['galileana','anel','regular','irregular'];
+  let html = `<div class="section-label">Luas (${list.length}) <span style="color:var(--text-faint); text-transform:none; letter-spacing:0;">· as com ✦ orbitam visivelmente no sistema</span></div>`;
+  order.forEach(g=>{
+    if(!groups[g]) return;
+    html += `<div style="font-size:9.5px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.08em;margin:10px 0 6px;">${moonGroupLabel(g)}</div>`;
+    html += `<div class="picker" style="padding:0 0 4px;border:none;">`;
+    html += groups[g].map(m=>`
+      <div class="chip" onclick="selectMoon('${planetKey}',${m.idx})">
+        <span class="dot" style="background:${m.cor}"></span>${m.destaque?'✦ ':''}${m.nome}
+      </div>`).join('');
+    html += `</div>`;
+  });
+  return html;
+}
+
+function renderDetail(){
+  if(selectedMoon && selectedMoon.planetKey===selected){
+    renderMoonDetail(selectedMoon.planetKey, selectedMoon.idx);
+    return;
+  }
+
+  const b = selected==='sun' ? SUN : BODIES.find(x=>x.key===selected);
+  const detail = document.getElementById('detail');
+  const speedKmH = rotEquatorSpeedKmH(b.raioKm, b.rotHoras);
+  const rotDias = Math.abs(b.rotHoras)/24;
+  const retro = b.rotHoras<0;
+
+  let orbitalBlock = '';
+  if(b.key!=='sun'){
+    orbitalBlock = `
+      <div class="section-label">Órbita</div>
+      <div class="stats">
+        <div class="stat"><span class="k">Distância do Sol</span><span class="v">${fmt(b.distanciaAU,3)} <small>UA</small></span></div>
+        <div class="stat"><span class="k">Distância</span><span class="v">${fmt(b.distanciaAU*149.6e6,0)} <small>km</small></span></div>
+        <div class="stat"><span class="k">Período orbital</span><span class="v">${b.periodoOrbitalDias>1000? fmt(b.periodoOrbitalDias/365.25,2)+' <small>anos</small>' : fmt(b.periodoOrbitalDias,2)+' <small>dias</small>'}</span></div>
+        <div class="stat"><span class="k">Velocidade orbital</span><span class="v">${fmt(b.velOrbitalKmS,2)} <small>km/s</small></span></div>
+      </div>`;
+  }
+
+  const moonsBlock = MOONS[b.key] ? buildMoonPickerHTML(b.key) : '';
+
+  detail.innerHTML = `
+    <div class="name">${b.nome}</div>
+    <div class="type">${b.tipo}</div>
+
+    <div class="instrument">
+      <div class="sphere-box">
+        <div class="sphere-tilt" id="sphereTilt" style="transform:rotate(${(90-b.inclinacaoAxial%180)}deg)">
+          <div class="axis-line"></div>
+          <div class="sphere" style="background:radial-gradient(circle at 32% 30%, ${b.cor}, #000 130%)">
+            <div class="stripes" id="stripes" style="background-image:repeating-linear-gradient(90deg, rgba(0,0,0,0.32) 0px, transparent 2px, transparent 10px, rgba(255,255,255,0.10) 12px, transparent 14px)"></div>
+          </div>
+        </div>
+      </div>
+      <div class="tilt-readout">
+        <div class="row"><span>Inclinação axial</span><b>${fmt(b.inclinacaoAxial,2)}°</b></div>
+        <div class="row"><span>Sentido</span><b>${retro? 'retrógrado' : 'prógrado'}</b></div>
+        <div class="row"><span>Dia sideral</span><b>${rotDias<1? fmt(Math.abs(b.rotHoras),2)+' h' : fmt(rotDias,2)+' d'}</b></div>
+      </div>
+    </div>
+
+    <div class="section-label">Gravidade &amp; rotação</div>
+    <div class="stats">
+      <div class="stat"><span class="k">Gravidade na superfície</span><span class="v">${fmt(b.gravidadeSup,3)} <small>m/s²</small></span></div>
+      <div class="stat"><span class="k">Relativo à Terra</span><span class="v">${fmt(b.gravidadeSup/G_EARTH,3)}× <small>g⊕</small></span></div>
+      <div class="stat"><span class="k">Velocidade de rotação (equador)</span><span class="v">${fmt(speedKmH,0)} <small>km/h</small></span></div>
+      <div class="stat"><span class="k">Raio</span><span class="v">${fmt(b.raioKm,0)} <small>km</small></span></div>
+      <div class="stat"><span class="k">Massa</span><span class="v">${b.massaKg.toExponential(3)} <small>kg</small></span></div>
+    </div>
+
+    ${orbitalBlock}
+    ${moonsBlock}
+
+    <div class="desc">${b.desc}</div>
+  `;
+
+  updateSpinDuration();
+}
+
+function renderMoonDetail(planetKey, idx){
+  const planet = BODIES.find(x=>x.key===planetKey);
+  const m = MOONS[planetKey][idx];
+  const detail = document.getElementById('detail');
+
+  const tidal = m.tidalLocked;
+  const rotHoras = tidal ? m.periodoOrbitalDias*24 : null;
+  const retro = m.periodoOrbitalDias<0;
+  const speedKmH = tidal ? rotEquatorSpeedKmH(m.raioKm, rotHoras) : null;
+  const orbSpeedKmS = (2*Math.PI*m.distanciaKm) / (Math.abs(m.periodoOrbitalDias)*86400);
+
+  const rotationRow = tidal
+    ? `<div class="row"><span>Dia sideral</span><b>${(Math.abs(m.periodoOrbitalDias)<1)? fmt(Math.abs(rotHoras),1)+' h' : fmt(Math.abs(m.periodoOrbitalDias),2)+' d'}</b></div>`
+    : `<div class="row"><span>Rotação</span><b>caótica / não sincron.</b></div>`;
+
+  detail.innerHTML = `
+    <div style="font-size:11px; color:var(--brass); cursor:pointer; margin-bottom:10px;" onclick="backToPlanet()">← voltar para ${planet.nome}</div>
+    <div class="name">${m.nome}</div>
+    <div class="type">Lua de ${planet.nome} ${m.descoberta? '· descoberta em '+m.descoberta : ''}</div>
+
+    <div class="instrument">
+      <div class="sphere-box">
+        <div class="sphere-tilt" style="transform:rotate(${tidal? (retro?100:80) : 90}deg)">
+          ${tidal? '<div class="axis-line"></div>' : ''}
+          <div class="sphere" style="background:radial-gradient(circle at 32% 30%, ${m.cor}, #000 130%)">
+            <div class="stripes" id="stripes" style="background-image:repeating-linear-gradient(90deg, rgba(0,0,0,0.32) 0px, transparent 2px, transparent 10px, rgba(255,255,255,0.10) 12px, transparent 14px)"></div>
+          </div>
+        </div>
+      </div>
+      <div class="tilt-readout">
+        <div class="row"><span>Rotação sincronizada</span><b>${tidal? 'sim' : 'não'}</b></div>
+        <div class="row"><span>Sentido orbital</span><b>${retro? 'retrógrado' : 'prógrado'}</b></div>
+        ${rotationRow}
+      </div>
+    </div>
+
+    <div class="section-label">Gravidade &amp; física</div>
+    <div class="stats">
+      <div class="stat"><span class="k">Gravidade na superfície</span><span class="v">${fmt(m.gravidadeSup,4)} <small>m/s²</small></span></div>
+      <div class="stat"><span class="k">Relativo à Terra</span><span class="v">${fmt(m.gravidadeSup/G_EARTH,4)}× <small>g⊕</small></span></div>
+      ${speedKmH!==null? `<div class="stat"><span class="k">Velocidade de rotação (equador)</span><span class="v">${fmt(speedKmH,1)} <small>km/h</small></span></div>` : ''}
+      <div class="stat"><span class="k">Raio</span><span class="v">${fmt(m.raioKm,1)} <small>km</small></span></div>
+      <div class="stat"><span class="k">Massa</span><span class="v">${m.massaKg.toExponential(2)} <small>kg${m.estimado?' (estimada)':''}</small></span></div>
+    </div>
+
+    <div class="section-label">Órbita ao redor de ${planet.nome}</div>
+    <div class="stats">
+      <div class="stat"><span class="k">Distância do planeta</span><span class="v">${fmt(m.distanciaKm,0)} <small>km</small></span></div>
+      <div class="stat"><span class="k">Período orbital</span><span class="v">${Math.abs(m.periodoOrbitalDias)>365? fmt(Math.abs(m.periodoOrbitalDias)/365.25,2)+' <small>anos</small>' : fmt(Math.abs(m.periodoOrbitalDias),2)+' <small>dias</small>'}</span></div>
+      <div class="stat"><span class="k">Velocidade orbital</span><span class="v">${fmt(orbSpeedKmS,3)} <small>km/s</small></span></div>
+    </div>
+
+    <div class="desc">${m.desc}</div>
+  `;
+
+  updateSpinDuration();
+}
+
+function getInstrumentBody(){
+  if(selectedMoon && selectedMoon.planetKey===selected){
+    const m = MOONS[selectedMoon.planetKey][selectedMoon.idx];
+    return { raioKm:m.raioKm, rotHoras: m.tidalLocked ? m.periodoOrbitalDias*24 : null };
+  }
+  const b = selected==='sun' ? SUN : BODIES.find(x=>x.key===selected);
+  return { raioKm:b.raioKm, rotHoras:b.rotHoras };
+}
+
+function updateSpinDuration(){
+  const b = getInstrumentBody();
+  const stripesEl = document.getElementById('stripes');
+  if(!stripesEl) return;
+  if(b.rotHoras===null){
+    stripesEl.style.animation = 'none';
+    return;
+  }
+  const daysPerSec = speedTable[speedIdx];
+  const rotDays = Math.abs(b.rotHoras)/24;
+  let visualSeconds = rotDays / daysPerSec;
+  visualSeconds = Math.max(0.6, Math.min(30, visualSeconds));
+  stripesEl.style.animation = `spin ${visualSeconds}s linear infinite ${b.rotHoras<0?'reverse':'normal'}`;
+}
+let _lastSpeedIdx = null;
+function updateInstrument(){
+  if(_lastSpeedIdx !== speedIdx){
+    _lastSpeedIdx = speedIdx;
+    updateSpinDuration();
+  }
+}
+
+const styleTag = document.createElement('style');
+styleTag.textContent = `@keyframes spin { from{background-position-x:0px;} to{background-position-x:56px;} }`;
+document.head.appendChild(styleTag);
+
+selectBody('earth', true);
+</script>
+</body>
+</html>
